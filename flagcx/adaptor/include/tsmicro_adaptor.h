@@ -1,14 +1,11 @@
 #ifdef USE_TSM_ADAPTOR
 
-#ifndef TSMICRO_ADAPTOR_H_
-#define TSMICRO_ADAPTOR_H_
-
 #include "adaptor.h"
 #include "alloc.h"
 #include "comm.h"
 #include "flagcx.h"
-#include "tccl.h"
 #include "tx_runtime.h"
+#include "tccl.h"
 
 #include <map>
 struct flagcxInnerComm {
@@ -26,12 +23,12 @@ struct flagcxEvent {
 struct flagcxIpcMemHandle {
   txIpcMemHandle_t base;
 };
-
+                                   
 #define DEVCHECK(func)                                                         \
   {                                                                            \
     int ret = func;                                                            \
-    if (ret != TX_SUCCESS)                                                     \
+    if (ret != TX_SUCCESS)                                                    \
       return flagcxUnhandledDeviceError;                                       \
   }
-#endif // end include guard
+
 #endif // USE_TSM_ADAPTOR
