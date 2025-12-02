@@ -48,6 +48,12 @@
 #include <c10/hip/HIPGuard.h>
 #include <c10/hip/impl/HIPGuardImpl.h>
 #include <hip/hip_runtime.h>
+#elif USE_TSM_ADAPTOR
+#include <c10/core/impl/InlineStreamGuard.h>
+#include <tx_runtime.h>
+#include <torch_txda/csrc/core/GuardImpl.h>
+#include <torch_txda/csrc/core/TXDAGuard.h>
+#include <torch_txda/csrc/core/TXDAStream.h>
 #endif
 
 namespace c10d {
@@ -83,6 +89,9 @@ public:
         guard_(c10_npu::getNPUStreamFromPool(deviceId))
 #elif USE_AMD_ADAPTOR
         guard_(at::hip::getStreamFromExternal(*(hipStream_t *)stream, deviceId))
+#elif USE_TSM_ADAPTOR
+        guard_(
+            at::txda::getStreamFromExternal(*(txStream_t *)stream, deviceId))
 #endif
   {
   }
@@ -123,6 +132,9 @@ public:
 #elif USE_AMD_ADAPTOR
     guard_.reset_stream(
         at::hip::getStreamFromExternal(*(hipStream_t *)stream, deviceId_));
+#elif USE_TSM_ADAPTOR
+    guard_.reset_stream(
+        at::txda::getStreamFromExternal(*(txStream_t *)stream, deviceId_));
 #endif
     currentStream_ = stream;
   }
@@ -153,6 +165,8 @@ private:
   c10_npu::NPUStream guard_;
 #elif USE_AMD_ADAPTOR
   c10::hip::HIPStreamGuard guard_;
+#elif USE_TSM_ADAPTOR
+  c10::txda::TXDAStreamGuard guard_;
 #endif
 };
 

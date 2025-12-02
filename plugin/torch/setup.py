@@ -10,7 +10,7 @@ if '--adaptor' in sys.argv:
     arg_index = sys.argv.index('--adaptor')
     sys.argv.remove("--adaptor")
     if arg_index < len(sys.argv):
-        assert sys.argv[arg_index] in ["nvidia", "iluvatar_corex", "cambricon", "metax", "du", "klx", "ascend", "musa", "amd"], f"Invalid adaptor: {adaptor_flag}"
+        assert sys.argv[arg_index] in ["nvidia", "iluvatar_corex", "cambricon", "metax", "du", "klx", "ascend", "musa", "amd", "tsm"], "Invalid adaptor: {}".format(sys.argv[arg_index])
         print(f"Using {sys.argv[arg_index]} adaptor")
         if sys.argv[arg_index] == "iluvatar_corex":
             adaptor_flag = "-DUSE_ILUVATAR_COREX_ADAPTOR"
@@ -28,6 +28,8 @@ if '--adaptor' in sys.argv:
             adaptor_flag = "-DUSE_ASCEND_ADAPTOR"
         elif sys.argv[arg_index] == "amd":
             adaptor_flag = "-DUSE_AMD_ADAPTOR"
+        elif sys.argv[arg_index] == "tsm":
+            adaptor_flag = "-DUSE_TSM_ADAPTOR"
     else:
         print("No adaptor provided after '--adaptor'. Using default nvidia adaptor")
     sys.argv.remove(sys.argv[arg_index])
@@ -91,6 +93,13 @@ elif adaptor_flag == "-DUSE_AMD_ADAPTOR":
     include_dirs += ["/opt/rocm/include"]
     library_dirs += ["/opt/rocm/lib"]
     libs += ["hiprtc", "c10_hip", "torch_hip"]
+elif adaptor_flag == "-DUSE_TSM_ADAPTOR":
+    import torch_txda
+    pytorch_txda_install_path = os.path.dirname(os.path.abspath(torch_txda.__file__))
+    pytorch_library_path = os.path.join(pytorch_txda_install_path, "lib")
+    include_dirs += [os.path.join(pytorch_txda_install_path, "include")]
+    library_dirs += [pytorch_library_path]
+    libs += ["torch_txda"]
 
 if adaptor_flag == "-DUSE_MUSA_ADAPTOR":
     from torch_musa.utils.musa_extension import MUSAExtension as CppExtension
