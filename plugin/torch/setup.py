@@ -1,46 +1,38 @@
 import os
 import sys
-
+from setuptools import setup
 # Disable auto load flagcx when setup
 os.environ["TORCH_DEVICE_BACKEND_AUTOLOAD"] = "0"
-
-# Modern setuptools (>=64) uses pip for 'develop' which creates isolated build envs.
-# For packages depending on torch, this often fails. 
-# We try to disable build isolation if not explicitly set.
-if "PIP_NO_BUILD_ISOLATION" not in os.environ:
-    os.environ["PIP_NO_BUILD_ISOLATION"] = "1"
-
 from setuptools import setup, find_packages
-from packaging.version import Version, parse as vparse
 
-adaptor = os.environ.get("FLAGCX_ADAPTOR", "nvidia")
+adaptor_flag = "-DUSE_NVIDIA_ADAPTOR"
 if '--adaptor' in sys.argv:
     arg_index = sys.argv.index('--adaptor')
     sys.argv.remove("--adaptor")
     if arg_index < len(sys.argv):
-        adaptor = sys.argv[arg_index]
-        sys.argv.remove(adaptor)
+        assert sys.argv[arg_index] in ["nvidia", "iluvatar_corex", "cambricon", "metax", "du", "klx", "ascend", "musa", "amd", "tsm"], "Invalid adaptor: {}".format(sys.argv[arg_index])
+        print(f"Using {sys.argv[arg_index]} adaptor")
+        if sys.argv[arg_index] == "iluvatar_corex":
+            adaptor_flag = "-DUSE_ILUVATAR_COREX_ADAPTOR"
+        elif sys.argv[arg_index] == "cambricon":
+            adaptor_flag = "-DUSE_CAMBRICON_ADAPTOR"
+        elif sys.argv[arg_index] == "metax":
+            adaptor_flag = "-DUSE_METAX_ADAPTOR"
+        elif sys.argv[arg_index] == "musa":
+            adaptor_flag = "-DUSE_MUSA_ADAPTOR"
+        elif sys.argv[arg_index] == "du":
+            adaptor_flag = "-DUSE_DU_ADAPTOR"
+        elif sys.argv[arg_index] == "klx":
+            adaptor_flag = "-DUSE_KUNLUNXIN_ADAPTOR"
+        elif sys.argv[arg_index] == "ascend":
+            adaptor_flag = "-DUSE_ASCEND_ADAPTOR"
+        elif sys.argv[arg_index] == "amd":
+            adaptor_flag = "-DUSE_AMD_ADAPTOR"
+        elif sys.argv[arg_index] == "tsm":
+            adaptor_flag = "-DUSE_TSM_ADAPTOR"
     else:
         print("No adaptor provided after '--adaptor'. Using default nvidia adaptor")
-
-valid_adaptors = ["nvidia", "iluvatar_corex", "cambricon", "metax", "du", "klx", "ascend", "musa", "amd", "enflame"]
-assert adaptor in valid_adaptors, f"Invalid adaptor: {adaptor}"
-print(f"Using {adaptor} adaptor")
-
-adaptor_map = {
-    "nvidia": "-DUSE_NVIDIA_ADAPTOR",
-    "iluvatar_corex": "-DUSE_ILUVATAR_COREX_ADAPTOR",
-    "cambricon": "-DUSE_CAMBRICON_ADAPTOR",
-    "metax": "-DUSE_METAX_ADAPTOR",
-    "musa": "-DUSE_MUSA_ADAPTOR",
-    "du": "-DUSE_DU_ADAPTOR",
-    "klx": "-DUSE_KUNLUNXIN_ADAPTOR",
-    "ascend": "-DUSE_ASCEND_ADAPTOR",
-    "amd": "-DUSE_AMD_ADAPTOR",
-    "enflame": "-DUSE_ENFLAME_ADAPTOR"
-}
-adaptor_flag = adaptor_map[adaptor]
-torch_flag = "-DTORCH_VER_LT_250"
+    sys.argv.remove(sys.argv[arg_index])
 
 sources = ["flagcx/src/backend_flagcx.cpp", "flagcx/src/utils_flagcx.cpp"]
 include_dirs = [
@@ -54,16 +46,7 @@ library_dirs = [
 ]
 
 libs = ["flagcx"]
-
-try:
-    import torch
-    torch_version = vparse(torch.__version__.split("+")[0])
-    if torch_version >= Version("2.5.0"):
-        print("torch version >= 2.5.0, set TORCH_VER_GE_250 flag")
-        torch_flag = "-DTORCH_VER_GE_250"
-except ImportError:
-    torch = None
-    print("Warning: torch not found.")
+extra_link_args = ["-Wl,-rpath,"+f"{os.path.dirname(os.path.abspath(__file__))}/../../build/lib"]
 
 if adaptor_flag == "-DUSE_NVIDIA_ADAPTOR":
     include_dirs += ["/usr/local/cuda/include"]
@@ -80,8 +63,7 @@ elif adaptor_flag == "-DUSE_CAMBRICON_ADAPTOR":
     torch_mlu_path = torch_mlu.__file__.split("__init__")[0]
     torch_mlu_lib_dir = os.path.join(torch_mlu_path, "csrc/lib/")
     torch_mlu_include_dir = os.path.join(torch_mlu_path, "csrc/")
-    torch_mlu_include_dir2 = os.path.join(torch_mlu_path, "csrc", "include")
-    include_dirs += [f"{neuware_home_path}/include", torch_mlu_include_dir, torch_mlu_include_dir2]
+    include_dirs += [f"{neuware_home_path}/include", torch_mlu_include_dir]
     library_dirs += [f"{neuware_home_path}/lib64", torch_mlu_lib_dir]
     libs += ["cnrt", "cncl", "torch_mlu"]
 elif adaptor_flag == "-DUSE_METAX_ADAPTOR":
@@ -113,52 +95,39 @@ elif adaptor_flag == "-DUSE_AMD_ADAPTOR":
     include_dirs += ["/opt/rocm/include"]
     library_dirs += ["/opt/rocm/lib"]
     libs += ["hiprtc", "c10_hip", "torch_hip"]
-elif adaptor_flag == "-DUSE_ENFLAME_ADAPTOR":
-    import torch_gcu
-    pytorch_gcu_install_path = os.path.dirname(os.path.abspath(torch_gcu.__file__))
-    pytorch_library_path = os.path.join(pytorch_gcu_install_path, "lib")
-    include_dirs += ["/opt/tops/include", os.path.join(pytorch_gcu_install_path, "include")]
-    library_dirs += ["/opt/tops/lib", pytorch_library_path]
-    libs += ["topsrt", "torch_gcu"]
+elif adaptor_flag == "-DUSE_TSM_ADAPTOR":
+    import torch_txda
+    txda_install_path = torch_txda.__path__[0]
+    txda_library_path = txda_install_path
+    include_dirs += [os.path.join(txda_install_path, "include")]
+    include_dirs += ["/usr/local/kuiper/include"]
+    library_dirs += ["/usr/local/kuiper/lib",txda_install_path]
+    libs += ["torch_txda", "hpgr"]
+    extra_link_args += [f'-Wl,-rpath,{txda_install_path}']
 
-try:
-    if adaptor_flag == "-DUSE_MUSA_ADAPTOR":
-        from torch_musa.utils.musa_extension import MUSAExtension as CppExtension
-        from torch_musa.utils.musa_extension import BuildExtension
-    elif adaptor_flag == "-DUSE_ENFLAME_ADAPTOR":
-        from tops_extension import TopsBuildExtension as BuildExtension
-        from tops_extension.torch import TopsTorchExtension as CppExtension
-    else:
-        from torch.utils.cpp_extension import CppExtension, BuildExtension
-except ImportError:
-    CppExtension = None
-    BuildExtension = None
-    print("Warning: CppExtension or BuildExtension not found.")
+if adaptor_flag == "-DUSE_MUSA_ADAPTOR":
+    from torch_musa.utils.musa_extension import MUSAExtension as CppExtension
+    from torch_musa.utils.musa_extension import BuildExtension
+else:
+    from torch.utils.cpp_extension import CppExtension, BuildExtension
 
-ext_modules = []
-if CppExtension is not None:
-    module = CppExtension(
-        name='flagcx._C',
-        sources=sources,
-        include_dirs=include_dirs,
-        extra_compile_args={
-            'cxx': [adaptor_flag, torch_flag]
-        },
-        extra_link_args=["-Wl,-rpath,"+f"{os.path.dirname(os.path.abspath(__file__))}/../../build/lib"],
-        library_dirs=library_dirs,
-        libraries=libs,
-    )
-    ext_modules.append(module)
-
-cmdclass = {}
-if BuildExtension is not None:
-    cmdclass['build_ext'] = BuildExtension
+module = CppExtension(
+    name='flagcx._C',
+    sources=sources,
+    include_dirs=include_dirs,
+    extra_compile_args={
+        'cxx': [adaptor_flag]
+    },
+    extra_link_args = extra_link_args,
+    library_dirs=library_dirs,
+    libraries=libs,
+)
 
 setup(
     name="flagcx",
-    version="0.8.0",
-    ext_modules=ext_modules,
-    cmdclass=cmdclass,
+    version="0.7.0",
+    ext_modules=[module],
+    cmdclass={'build_ext': BuildExtension},
     packages=find_packages(),
     entry_points={"torch.backends": ["flagcx = flagcx:init"]},
 )
