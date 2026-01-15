@@ -4,8 +4,10 @@ from setuptools import setup
 # Disable auto load flagcx when setup
 os.environ["TORCH_DEVICE_BACKEND_AUTOLOAD"] = "0"
 from setuptools import setup, find_packages
+from packaging.version import Version, parse as vparse
 
 adaptor_flag = "-DUSE_NVIDIA_ADAPTOR"
+torch_flag = "-DTORCH_VER_LT_250"
 if '--adaptor' in sys.argv:
     arg_index = sys.argv.index('--adaptor')
     sys.argv.remove("--adaptor")
@@ -52,6 +54,11 @@ if adaptor_flag == "-DUSE_NVIDIA_ADAPTOR":
     include_dirs += ["/usr/local/cuda/include"]
     library_dirs += ["/usr/local/cuda/lib64"]
     libs += ["cuda", "cudart", "c10_cuda", "torch_cuda"]
+    import torch
+    torch_version = vparse(torch.__version__.split("+")[0])
+    if torch_version >= Version("2.5.0"):
+        print("torch version >= 2.5.0, set TORCH_VER_GE_250 flag")
+        torch_flag = "-DTORCH_VER_GE_250"
 elif adaptor_flag == "-DUSE_ILUVATAR_COREX_ADAPTOR":
     include_dirs += ["/usr/local/corex/include"]
     library_dirs += ["/usr/local/corex/lib64"]
@@ -70,6 +77,11 @@ elif adaptor_flag == "-DUSE_METAX_ADAPTOR":
     include_dirs += ["/opt/maca/include"]
     library_dirs += ["/opt/maca/lib64"]
     libs += ["cuda", "cudart", "c10_cuda", "torch_cuda"]
+    torch_version = vparse(torch.__version__.split("+")[0])
+    import torch
+    if torch_version >= Version("2.5.0"):
+        print("torch version >= 2.5.0, set TORCH_VER_GE_250 flag")
+        torch_flag = "-DTORCH_VER_GE_250"
 elif adaptor_flag == "-DUSE_MUSA_ADAPTOR":
     import torch_musa
     pytorch_musa_install_path = os.path.dirname(os.path.abspath(torch_musa.__file__))
@@ -116,7 +128,7 @@ module = CppExtension(
     sources=sources,
     include_dirs=include_dirs,
     extra_compile_args={
-        'cxx': [adaptor_flag]
+        'cxx': [adaptor_flag, torch_flag]
     },
     extra_link_args = extra_link_args,
     library_dirs=library_dirs,
@@ -125,7 +137,7 @@ module = CppExtension(
 
 setup(
     name="flagcx",
-    version="0.7.0",
+    version="0.8.0",
     ext_modules=[module],
     cmdclass={'build_ext': BuildExtension},
     packages=find_packages(),
