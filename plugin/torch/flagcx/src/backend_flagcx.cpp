@@ -348,10 +348,10 @@ std::unique_ptr<flagcxEvent> &flagcxBackend::getEventByIndex(int eventId) {
     flagcxEvents_[eventId] = std::make_unique<flagcxXpuEvent>();
 #elif USE_AMD_ADAPTOR
     flagcxEvents_[eventId] = std::make_unique<flagcxHipEvent>();
-#elif USE_ENFLAME_ADAPTOR
-    flagcxEvents_[eventId] = std::make_unique<flagcxTopsEvent>();
 #elif USE_TSM_ADAPTOR
     flagcxEvents_[eventId] = std::make_unique<flagcxTxdaEvent>();
+#elif USE_ENFLAME_ADAPTOR
+    flagcxEvents_[eventId] = std::make_unique<flagcxTopsEvent>();
 #endif
     return flagcxEvents_[eventId];
   }
