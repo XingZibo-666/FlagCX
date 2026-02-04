@@ -105,6 +105,11 @@ void check_device(at::Device dev1, at::Device dev2) {
         "flagcxBackend does not support multidevice tensors");
   }
 #elif USE_ASCEND_ADAPTOR
+    if (dev1.is_privateuseone() && dev2.is_privateuseone() && dev1 != dev2) {
+    throw std::runtime_error(
+        "flagcxBackend does not support multidevice tensors");
+  }
+#elif USE_TSM_ADAPTOR
   if (dev1.is_privateuseone() && dev2.is_privateuseone() && dev1 != dev2) {
     throw std::runtime_error(
         "flagcxBackend does not support multidevice tensors");
@@ -345,6 +350,8 @@ std::unique_ptr<flagcxEvent> &flagcxBackend::getEventByIndex(int eventId) {
     flagcxEvents_[eventId] = std::make_unique<flagcxHipEvent>();
 #elif USE_ENFLAME_ADAPTOR
     flagcxEvents_[eventId] = std::make_unique<flagcxTopsEvent>();
+#elif USE_TSM_ADAPTOR
+    flagcxEvents_[eventId] = std::make_unique<flagcxTxdaEvent>();
 #endif
     return flagcxEvents_[eventId];
   }
@@ -408,6 +415,9 @@ void flagcxBackend::initComm() {
 #elif defined(USE_MUSA_ADAPTOR)
   initComm(
       c10::impl::getDeviceGuardImpl(at::DeviceType::PrivateUse1)->getDevice());
+#elif defined(USE_TSM_ADAPTOR)
+      initComm(
+          c10::impl::getDeviceGuardImpl(at::DeviceType::PrivateUse1)->getDevice());
 #endif
 }
 
